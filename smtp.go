@@ -68,8 +68,7 @@ func (s *Smtp) GetRecipients() []string {
 func (s *Smtp) Helo(args ...string) (close bool) {
 	if len(args) == 0 || args[0] == "" {
 		s.Reply(501, "Syntax error in parameters or arguments")
-		close = false
-		return
+		return false
 	}
 
 	hostname := args[0]
@@ -90,8 +89,7 @@ func (s *Smtp) Helo(args ...string) (close bool) {
 		},
 	})
 
-	close = false
-	return
+	return false
 }
 
 func (s *Smtp) Noop(args ...string) (close bool) {
@@ -99,8 +97,7 @@ func (s *Smtp) Noop(args ...string) (close bool) {
 		Name: "NOOP",
 	})
 
-	close = false
-	return
+	return false
 }
 
 func (s *Smtp) Expn(args ...string) (close bool) {
@@ -109,8 +106,8 @@ func (s *Smtp) Expn(args ...string) (close bool) {
 		Arguments:    args,
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
 	})
-	close = false
-	return
+
+	return false
 }
 
 func (s *Smtp) Turn(args ...string) (close bool) {
@@ -120,8 +117,8 @@ func (s *Smtp) Turn(args ...string) (close bool) {
 		Name:         "TURN",
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
 	})
-	close = false
-	return
+
+	return false
 }
 
 func (s *Smtp) Vrfy(address ...string) (close bool) {
@@ -131,8 +128,7 @@ func (s *Smtp) Vrfy(address ...string) (close bool) {
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
 	})
 
-	close = false
-	return
+	return false
 }
 
 func (s *Smtp) Help(args ...string) (close bool) {
@@ -142,36 +138,31 @@ func (s *Smtp) Help(args ...string) (close bool) {
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
 	})
 
-	close = false
-	return
+	return false
 }
 
 func (s *Smtp) Mail(args ...string) (close bool) {
 	if s.ReversePath == "0" {
 		s.Reply(503, "Bad sequence of commands")
-		close = false
-		return
+		return false
 	}
 
 	re, _ := regexp.Compile("^from:\\s*")
 	if re.MatchString(strings.ToLower(args[0])) == false {
 		s.Reply(501, "Syntax error in parameters or arguments")
-		close = false
-		return
+		return false
 	}
 	args[0] = re.ReplaceAllString(strings.ToLower(args[0]), "")
 
 	if len(s.ForwardPath) > 0 {
 		s.Reply(503, "Bad sequence of commands")
-		close = false
-		return
+		return false
 	}
 
 	re, _ = regexp.Compile("^<(.*?)>(?: (\\S.*))?$")
 	if re.MatchString(args[0]) == false {
 		s.Reply(501, "Syntax error in parameters or arguments")
-		close = false
-		return
+		return false
 	}
 	rets := re.FindAllStringSubmatch(args[0], -1)
 	address := rets[0][1]
@@ -182,8 +173,7 @@ func (s *Smtp) Mail(args ...string) (close bool) {
 	}
 
 	if s.HandleOptions("Mail", address, options) == false {
-		close = false
-		return
+		return false
 	}
 
 	s.MakeEvent(&Event{
@@ -197,30 +187,26 @@ func (s *Smtp) Mail(args ...string) (close bool) {
 		FailureReply: &Reply{Code: 550, Message: "Failure"},
 	})
 
-	close = false
-	return
+	return false
 }
 
 func (s *Smtp) Rcpt(args ...string) (close bool) {
 	if len(s.ForwardPath) <= 0 {
 		s.Reply(503, "Bad sequence of commands")
-		close = false
-		return
+		return false
 	}
 
 	re, _ := regexp.Compile("^to:\\s*")
 	if re.MatchString(strings.ToLower(args[0])) == false {
 		s.Reply(501, "Syntax error in parameters or arguments")
-		close = false
-		return
+		return false
 	}
 	args[0] = re.ReplaceAllString(strings.ToLower(args[0]), "")
 
 	re, _ = regexp.Compile("^<(.*?)>(?: (\\S.*))?$")
 	if re.MatchString(args[0]) == false {
 		s.Reply(501, "Syntax error int parameters or arguments")
-		close = false
-		return
+		return false
 	}
 	rets := re.FindAllStringSubmatch(args[0], -1)
 	address := rets[0][1]
@@ -231,8 +217,7 @@ func (s *Smtp) Rcpt(args ...string) (close bool) {
 	}
 
 	if s.HandleOptions("RCPT", address, options) == false {
-		close = false
-		return
+		return false
 	}
 
 	s.MakeEvent(&Event{
@@ -248,8 +233,7 @@ func (s *Smtp) Rcpt(args ...string) (close bool) {
 		FailureReply: &Reply{Code: 550, Message: "Failure"},
 	})
 
-	close = false
-	return
+	return false
 }
 
 func (s *Smtp) Send(args ...string) (close bool) {
@@ -257,8 +241,7 @@ func (s *Smtp) Send(args ...string) (close bool) {
 		Name:         "SEND",
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
 	})
-	close = false
-	return
+	return false
 }
 
 func (s *Smtp) Soml(args ...string) (close bool) {
@@ -266,8 +249,7 @@ func (s *Smtp) Soml(args ...string) (close bool) {
 		Name:         "SOML",
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
 	})
-	close = false
-	return
+	return false
 }
 
 func (s *Smtp) Saml(args ...string) (close bool) {
@@ -275,21 +257,18 @@ func (s *Smtp) Saml(args ...string) (close bool) {
 		Name:         "SAML",
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
 	})
-	close = false
-	return
+	return false
 }
 
 func (s *Smtp) Data(args ...string) (close bool) {
 	if s.MaildataPath == false {
 		s.Reply(503, "Bad sequence of commands")
-		close = false
-		return
+		return false
 	}
 
 	if args[0] != "" {
 		s.Reply(501, "Syntax error in parameters or arguments")
-		close = false
-		return
+		return false
 	}
 
 	s.LastChunk = ""
@@ -299,8 +278,7 @@ func (s *Smtp) Data(args ...string) (close bool) {
 		SuccessReply: &Reply{Code: 354, Message: "Start mail input; end with <CRLF>.<CRLF>"},
 	})
 
-	close = false
-	return
+	return false
 }
 
 // Because data is cutted into pieces (4096 bytes), we have to search
