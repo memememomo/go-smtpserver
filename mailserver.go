@@ -154,8 +154,12 @@ func (m *MailServer) Callback(name string, args ...string) (int, int, string) {
 	return 1, -1, ""
 }
 
-func (m *MailServer) SetCallback(name string, code func(...string) (int, int, string), context string) {
-	m.CallbackMap[name] = &Callback{Code: code, Context: context}
+func (m *MailServer) SetCallback(name string, code func(...string) (int, int, string), context ...string) {
+	cb := &Callback{Code: code}
+	if len(context) > 0 {
+		cb.Context = context[0]
+	}
+	m.CallbackMap[name] = cb
 }
 
 func (m *MailServer) DefVerb(verb string, cb func(...string) bool) {

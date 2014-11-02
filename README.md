@@ -32,8 +32,8 @@ func main() {
             "",
         }
         smtp = smtp.Init(&Option{Socket: conn})
-        smtp.SetCallback("RCPT", smtp.ValidateRecipient, "")
-        smtp.SetCallback("DATA", smtp.QueueMessage, "")
+        smtp.SetCallback("RCPT", smtp.ValidateRecipient)
+        smtp.SetCallback("DATA", smtp.QueueMessage)
         smtp.Process()
         conn.Close()
     }
