@@ -100,7 +100,7 @@ func TestMain(t *testing.T) {
 	}
 }
 
-func (s *Smtp) ValidateRecipient(args ...string) (int, int, string) {
+func (s *Smtp) ValidateRecipient(args ...string) *Reply {
 	local_domains := []string{"example.com", "example.org"}
 	recipient := args[0]
 
@@ -113,7 +113,7 @@ func (s *Smtp) ValidateRecipient(args ...string) (int, int, string) {
 	}
 
 	if domain == "" {
-		return 0, 513, "Syntax error."
+		return &Reply{0, 513, "Syntax error."}
 	}
 
 	var valid = false
@@ -125,27 +125,27 @@ func (s *Smtp) ValidateRecipient(args ...string) (int, int, string) {
 	}
 
 	if valid == false {
-		return 0, 554, fmt.Sprintf("%s: Recipient address rejected: Relay access denied", recipient)
+		return &Reply{0, 554, fmt.Sprintf("%s: Recipient address rejected: Relay access denied", recipient)}
 	}
 
-	return 1, -1, ""
+	return &Reply{1, -1, ""}
 }
 
-func (s *Smtp) QueueMessage(args ...string) (int, int, string) {
+func (s *Smtp) QueueMessage(args ...string) *Reply {
 	data := args[0]
 	sender := s.GetSender()
 	recipients := s.GetRecipients()
 
 	if len(recipients) == 0 {
-		return 0, 554, "Error: no valid recipients"
+		return &Reply{0, 554, "Error: no valid recipients"}
 	}
 
 	msgid := s.AddQueue(sender, recipients, data)
 	if msgid == 0 {
-		return 0, -1, ""
+		return &Reply{0, -1, ""}
 	}
 
-	return 1, 250, fmt.Sprintf("message queued %d", msgid)
+	return &Reply{1, 250, fmt.Sprintf("message queued %d", msgid)}
 }
 
 func (s *Smtp) AddQueue(sender string, recipients []string, data string) int {

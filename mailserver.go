@@ -45,7 +45,7 @@ type Event struct {
 }
 
 type Callback struct {
-	Code    func(...string) (int, int, string)
+	Code    func(...string) *Reply
 	Context string
 }
 
@@ -77,24 +77,24 @@ func (m *MailServer) MakeEvent(e *Event) int {
 	args := e.Arguments
 
 	m.InitDojob()
-	success, code, msg := m.Callback(name, args...)
+	reply := m.Callback(name, args...)
 
 	// we have to take a proper decision if successness is undefined
-	if success == -1 {
+	if reply.Success == -1 {
 		if e.DefaultReply != nil {
-			success = e.DefaultReply.Success
-			code = e.DefaultReply.Code
-			msg = e.DefaultReply.Message
+			reply.Success = e.DefaultReply.Success
+			reply.Code = e.DefaultReply.Code
+			reply.Message = e.DefaultReply.Message
 		} else {
 			// default
-			success = 1
+			reply.Success = 1
 		}
 	}
 
 	// command may have some job to do regarding to the result. handler
 	// can avoid it by calling dojob() method with a false value.
 	if m.DoJob {
-		if success > 0 {
+		if reply.Success > 0 {
 			if e.OnSuccess != nil {
 				e.OnSuccess()
 			}
@@ -106,20 +106,20 @@ func (m *MailServer) MakeEvent(e *Event) int {
 	}
 
 	// ensure that a reply is sent, all SMTP command need at most 1 reply.
-	if code == -1 {
-		if success > 0 {
-			code, msg = m.GetDefaultReply(e.SuccessReply, 250)
+	if reply.Code == -1 {
+		if reply.Success > 0 {
+			reply.Code, reply.Message = m.GetDefaultReply(e.SuccessReply, 250)
 		} else {
-			code, msg = m.GetDefaultReply(e.FailureReply, 550)
+			reply.Code, reply.Message = m.GetDefaultReply(e.FailureReply, 550)
 		}
 	}
 
 	// if defined code and length code
-	if code > 0 {
-		m.HandleReply(name, success, code, msg)
+	if reply.Code > 0 {
+		m.HandleReply(name, reply)
 	}
 
-	return success
+	return reply.Success
 }
 
 func (m *MailServer) GetDefaultReply(config *Reply, default_code int) (int, string) {
@@ -136,25 +136,25 @@ func (m *MailServer) GetDefaultReply(config *Reply, default_code int) (int, stri
 	return code, msg
 }
 
-func (m *MailServer) HandleReply(verb string, success int, code int, msg string) {
+func (m *MailServer) HandleReply(verb string, reply *Reply) {
 	// don't reply anything if code is empty
-	if code != 0 {
-		m.Reply(code, msg)
+	if reply.Code != 0 {
+		m.Reply(reply.Code, reply.Message)
 	}
 }
 
-func (m *MailServer) Callback(name string, args ...string) (int, int, string) {
+func (m *MailServer) Callback(name string, args ...string) *Reply {
 	if _, ok := m.CallbackMap[name]; ok == true {
 		cb := m.CallbackMap[name]
 		m.Context = cb.Context
-		success, code, message := cb.Code(args...)
-		return success, code, message
+		reply := cb.Code(args...)
+		return reply
 	}
 
-	return 1, -1, ""
+	return &Reply{Success: 1, Code: -1}
 }
 
-func (m *MailServer) SetCallback(name string, code func(...string) (int, int, string), context ...string) {
+func (m *MailServer) SetCallback(name string, code func(...string) *Reply, context ...string) {
 	cb := &Callback{Code: code}
 	if len(context) > 0 {
 		cb.Context = context[0]
