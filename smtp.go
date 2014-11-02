@@ -1,4 +1,4 @@
-package mailserver
+package smtpserver
 
 import (
 	"fmt"
@@ -7,13 +7,14 @@ import (
 )
 
 type Smtp struct {
-	*MailServer
+	MailServer
 	ReversePath        string
 	ForwardPath        []string
 	MaildataPath       bool
 	DataBuf            string
 	DataHandleMoreData bool
 	LastChunk          string
+	OptionHandler      func(string, string, []string) bool
 }
 
 func (s *Smtp) Init(options *Option) *Smtp {
@@ -42,6 +43,8 @@ func (s *Smtp) Init(options *Option) *Smtp {
 	// handle data after the end of data indicator (.)
 	s.DataHandleMoreData = false
 
+	s.OptionHandler = s.HandleOptions
+
 	return s
 }
 
@@ -65,7 +68,7 @@ func (s *Smtp) GetRecipients() []string {
 	return s.ForwardPath
 }
 
-func (s *Smtp) Helo(args ...string) (close bool) {
+func (s *Smtp) Helo(obj interface{}, args ...string) (close bool) {
 	if len(args) == 0 || args[0] == "" {
 		s.Reply(501, "Syntax error in parameters or arguments")
 		return false
@@ -92,7 +95,7 @@ func (s *Smtp) Helo(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Noop(args ...string) (close bool) {
+func (s *Smtp) Noop(obj interface{}, args ...string) (close bool) {
 	s.MakeEvent(&Event{
 		Name: "NOOP",
 	})
@@ -100,7 +103,7 @@ func (s *Smtp) Noop(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Expn(args ...string) (close bool) {
+func (s *Smtp) Expn(obj interface{}, args ...string) (close bool) {
 	s.MakeEvent(&Event{
 		Name:         "EXPN",
 		Arguments:    args,
@@ -110,7 +113,7 @@ func (s *Smtp) Expn(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Turn(args ...string) (close bool) {
+func (s *Smtp) Turn(obj interface{}, args ...string) (close bool) {
 	// deprecated in RFC 2821
 	s.Reply(502, "Command not implemented")
 	s.MakeEvent(&Event{
@@ -121,7 +124,7 @@ func (s *Smtp) Turn(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Vrfy(address ...string) (close bool) {
+func (s *Smtp) Vrfy(obj interface{}, address ...string) (close bool) {
 	s.MakeEvent(&Event{
 		Name:         "VRFY",
 		Arguments:    address,
@@ -131,7 +134,7 @@ func (s *Smtp) Vrfy(address ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Help(args ...string) (close bool) {
+func (s *Smtp) Help(obj interface{}, args ...string) (close bool) {
 	s.MakeEvent(&Event{
 		Name:         "HELP",
 		Arguments:    args,
@@ -141,7 +144,7 @@ func (s *Smtp) Help(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Mail(args ...string) (close bool) {
+func (s *Smtp) Mail(obj interface{}, args ...string) (close bool) {
 	if s.ReversePath == "0" {
 		s.Reply(503, "Bad sequence of commands")
 		return false
@@ -152,7 +155,8 @@ func (s *Smtp) Mail(args ...string) (close bool) {
 		s.Reply(501, "Syntax error in parameters or arguments")
 		return false
 	}
-	args[0] = re.ReplaceAllString(strings.ToLower(args[0]), "")
+	index := re.FindStringIndex(strings.ToLower(args[0]))
+	args[0] = args[0][index[1]:]
 
 	if len(s.ForwardPath) > 0 {
 		s.Reply(503, "Bad sequence of commands")
@@ -168,11 +172,11 @@ func (s *Smtp) Mail(args ...string) (close bool) {
 	address := rets[0][1]
 
 	var options []string
-	if len(rets) > 1 {
-		options = strings.Split(rets[1][1], " ")
+	if len(rets[0]) > 1 && rets[0][2] != "" {
+		options = strings.Split(rets[0][2], " ")
 	}
 
-	if s.HandleOptions("Mail", address, options) == false {
+	if s.OptionHandler("MAIL", address, options) == false {
 		return false
 	}
 
@@ -190,7 +194,7 @@ func (s *Smtp) Mail(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Rcpt(args ...string) (close bool) {
+func (s *Smtp) Rcpt(obj interface{}, args ...string) (close bool) {
 	if len(s.ForwardPath) <= 0 {
 		s.Reply(503, "Bad sequence of commands")
 		return false
@@ -216,7 +220,7 @@ func (s *Smtp) Rcpt(args ...string) (close bool) {
 		options = strings.Split(rets[1][1], " ")
 	}
 
-	if s.HandleOptions("RCPT", address, options) == false {
+	if s.OptionHandler("RCPT", address, options) == false {
 		return false
 	}
 
@@ -239,7 +243,7 @@ func (s *Smtp) Rcpt(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Send(args ...string) (close bool) {
+func (s *Smtp) Send(obj interface{}, args ...string) (close bool) {
 	s.MakeEvent(&Event{
 		Name:         "SEND",
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
@@ -247,7 +251,7 @@ func (s *Smtp) Send(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Soml(args ...string) (close bool) {
+func (s *Smtp) Soml(obj interface{}, args ...string) (close bool) {
 	s.MakeEvent(&Event{
 		Name:         "SOML",
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
@@ -255,7 +259,7 @@ func (s *Smtp) Soml(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Saml(args ...string) (close bool) {
+func (s *Smtp) Saml(obj interface{}, args ...string) (close bool) {
 	s.MakeEvent(&Event{
 		Name:         "SAML",
 		DefaultReply: &Reply{Code: 502, Message: "Command not implemented"},
@@ -263,7 +267,7 @@ func (s *Smtp) Saml(args ...string) (close bool) {
 	return false
 }
 
-func (s *Smtp) Data(args ...string) (close bool) {
+func (s *Smtp) Data(obj interface{}, args ...string) (close bool) {
 	if s.MaildataPath == false {
 		s.Reply(503, "Bad sequence of commands")
 		return false
@@ -287,7 +291,7 @@ func (s *Smtp) Data(args ...string) (close bool) {
 // Because data is cutted into pieces (4096 bytes), we have to search
 // "\r\n.\r\n" sequence in 2 consecutive pieces. s.LastChunk
 // contains the last 5 bytes.
-func (s *Smtp) DataPart(m *MailServer, data string) bool {
+func (s *Smtp) DataPart(data string) bool {
 
 	// search for end of data indicator
 	re, _ := regexp.Compile("\r?\n\\.\r?\n(.*)")
@@ -369,13 +373,13 @@ func (s *Smtp) DataFinished(more_data string) bool {
 
 	// if more data, handle it
 	if len(more_data) > 0 {
-		return s.ProcessOperation(more_data)
+		return s.CurProcessOperation(more_data)
 	} else {
 		return false
 	}
 }
 
-func (s *Smtp) Rset(args ...string) bool {
+func (s *Smtp) Rset(obj interface{}, args ...string) bool {
 	s.MakeEvent(&Event{
 		Name: "RSET",
 		OnSuccess: func() {
@@ -390,7 +394,7 @@ func (s *Smtp) Rset(args ...string) bool {
 	return false
 }
 
-func (s *Smtp) Quit(args ...string) bool {
+func (s *Smtp) Quit(obj interface{}, args ...string) bool {
 	s.MakeEvent(&Event{
 		Name:         "QUIT",
 		SuccessReply: &Reply{Code: 221, Message: fmt.Sprintf("%s Service closing transmission channel", s.GetHostname())},

@@ -1,4 +1,4 @@
-package mailserver
+package smtpserver
 
 import (
 	"fmt"
@@ -9,21 +9,22 @@ import (
 )
 
 type MailServer struct {
-	In           *net.TCPConn
-	Out          *net.TCPConn
-	DoJob        bool
-	Context      string
-	CallbackMap  map[string]*Callback
-	Verb         map[string]func(...string) (close bool)
-	NextInput    func(*MailServer, string) bool
-	Options      *Option
-	BannerString string
+	In                  net.Conn
+	Out                 net.Conn
+	DoJob               bool
+	Context             string
+	CallbackMap         map[string]*Callback
+	Verb                map[string]func(interface{}, ...string) (close bool)
+	NextInput           func(string) bool
+	Options             *Option
+	BannerString        string
+	CurProcessOperation func(string) bool
 }
 
 type Option struct {
-	HandleIn       *net.TCPConn
-	HandleOut      *net.TCPConn
-	Socket         *net.TCPConn
+	HandleIn       net.Conn
+	HandleOut      net.Conn
+	Socket         net.Conn
 	ErrorSleepTime int
 	IdleTimeout    int
 }
@@ -52,18 +53,12 @@ type Callback struct {
 func (m *MailServer) Init(options *Option) *MailServer {
 	m.Options = options
 
-	if options.HandleIn != nil && options.HandleOut != nil {
-
-	} else if options.Socket != nil {
-		m.In = options.Socket
-		m.Out = options.Socket
-	} else {
-		// m.In = IO::Handle->new->fdopen(fileno(STDIN), "r")
-		// m.Out = IO::Handle->new->fdopen(fileno(STDOUT), "w")
-	}
-
+	m.In = options.Socket
+	m.Out = options.Socket
 	m.CallbackMap = make(map[string]*Callback)
-	m.Verb = make(map[string]func(...string) (close bool))
+	m.Verb = make(map[string]func(interface{}, ...string) (close bool))
+
+	m.CurProcessOperation = m.ProcessOperation
 
 	return m
 }
@@ -122,18 +117,15 @@ func (m *MailServer) MakeEvent(e *Event) int {
 	return reply.Success
 }
 
-func (m *MailServer) GetDefaultReply(config *Reply, default_code int) (int, string) {
-	var code int
-	var msg string
-
+func (m *MailServer) GetDefaultReply(config *Reply, default_code int) (code int, msg string) {
 	if config != nil {
 		code = config.Code
 		msg = config.Message
 	} else {
 		code = default_code
+		msg = ""
 	}
-
-	return code, msg
+	return
 }
 
 func (m *MailServer) HandleReply(verb string, reply *Reply) {
@@ -144,8 +136,7 @@ func (m *MailServer) HandleReply(verb string, reply *Reply) {
 }
 
 func (m *MailServer) Callback(name string, args ...string) *Reply {
-	if _, ok := m.CallbackMap[name]; ok == true {
-		cb := m.CallbackMap[name]
+	if cb, ok := m.CallbackMap[name]; ok == true {
 		m.Context = cb.Context
 		reply := cb.Code(args...)
 		return reply
@@ -162,7 +153,7 @@ func (m *MailServer) SetCallback(name string, code func(...string) *Reply, conte
 	m.CallbackMap[name] = cb
 }
 
-func (m *MailServer) DefVerb(verb string, cb func(...string) bool) {
+func (m *MailServer) DefVerb(verb string, cb func(interface{}, ...string) bool) {
 	m.Verb[strings.ToUpper(verb)] = cb
 }
 
@@ -180,7 +171,7 @@ func (m *MailServer) ListVerb() []string {
 	return keys
 }
 
-func (m *MailServer) NextInputTo(method_ref func(*MailServer, string) bool) func(*MailServer, string) bool {
+func (m *MailServer) NextInputTo(method_ref func(string) bool) func(string) bool {
 	if method_ref != nil {
 		m.NextInput = method_ref
 	}
@@ -192,7 +183,7 @@ func (m *MailServer) TellNextInputMethod(input string) bool {
 	// before calling the code, because code can resetup this variable.
 	code := m.NextInput
 	m.NextInput = nil
-	rv := code(m, input)
+	rv := code(input)
 	return rv
 }
 
@@ -211,7 +202,7 @@ func (m *MailServer) Process() bool {
 
 		go func() {
 			var err error
-			read_size, err = in.Read(buffer)
+			read_size, err = in.(*net.TCPConn).Read(buffer)
 			if err != nil {
 				ch <- 0
 				return
@@ -221,7 +212,7 @@ func (m *MailServer) Process() bool {
 		if m.Options.IdleTimeout > 0 {
 			go func() {
 				time.Sleep(time.Second * time.Duration(m.Options.IdleTimeout))
-				in.Close()
+				in.(*net.TCPConn).Close()
 				ch <- 0
 			}()
 		}
@@ -248,7 +239,7 @@ func (m *MailServer) Process() bool {
 			if m.NextInput != nil {
 				rv = m.TellNextInputMethod(string(chunk))
 			} else {
-				rv = m.ProcessOperation(string(chunk))
+				rv = m.CurProcessOperation(string(chunk))
 			}
 
 			// if rv is defined, we have to close the connection
@@ -278,7 +269,7 @@ func (m *MailServer) ProcessOnce(operation string) bool {
 	if m.NextInput != nil {
 		return m.TellNextInputMethod(operation)
 	} else {
-		return m.ProcessOperation(operation)
+		return m.CurProcessOperation(operation)
 	}
 }
 
@@ -294,14 +285,18 @@ func (m *MailServer) ProcessOperation(operation string) bool {
 
 func (m *MailServer) ProcessCommand(verb string, params string) bool {
 	if action, ok := m.Verb[verb]; ok {
-		return action(params)
+		return m.ExecAction(action, params)
 	} else {
 		m.Reply(500, "Syntax error: unrecognized command")
 		return false
 	}
 }
 
-func (m *MailServer) TokenizeCommand(line string) (string, string) {
+func (m *MailServer) ExecAction(action func(interface{}, ...string) (close bool), params string) bool {
+	return action(m, params)
+}
+
+func (m *MailServer) TokenizeCommand(line string) (verb string, params string) {
 	line = strings.TrimRight(line, "\r\n")
 	line = strings.TrimRight(line, "\n")
 	line = strings.TrimSpace(line)
