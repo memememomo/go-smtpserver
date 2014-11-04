@@ -9,12 +9,16 @@ type Esmtp struct {
 	ExtendMode bool
 }
 
+type SubOption struct {
+	Verb      string
+	OptionKey string
+	Code      interface{}
+}
+
 func (e *Esmtp) Init(options *Option) *Esmtp {
 	e.Smtp.Init(options)
-
 	e.DefVerb("EHLO", e.Ehlo)
-	e._ExtendMode = false
-
+	e.ExtendMode = false
 	return e
 }
 
@@ -26,18 +30,32 @@ func (e *Esmtp) GetExtensions() {
 	return e.Extensions
 }
 
-func (e *Esmtp) Register(class string) {
+func (e *Esmtp) Register(extend *Extension) bool {
+	for _, verb_def := range extend.Verb() {
+		e.DefVerb(verb_def)
+	}
 
+	for _, option_def := range extend.Option {
+		e.SubOption(option_def)
+	}
+
+	for _, reply_def := range extend.Reply {
+		e.SubReply(reply_def)
+	}
+
+	e.Extensions = append(e.Extensions, extend)
+
+	return true
 }
 
-func (e *Esmtp) SubOption(verb string, option_key string, code string) error {
-	if verb == "MAIL" || verb == "RCPT" {
+func (e *Esmtp) SubOption(opt *SubOption) error {
+	if opt.Verb != "MAIL" && opt.Verb != "RCPT" {
 		return fmt.Sprintf("can't subscribe to option for verb '%s'", verb)
 	}
-	if _, exists := e.Xoption[verb][option_key]; exists == true {
-		return fmt.Sprintf("already subscribed '%s'", option_key)
+	if _, exists := e.Xoption[opt.Verb][opt.OptionKey]; exists == true {
+		return fmt.Sprintf("already subscribed '%s'", opt.OptionKey)
 	}
-	e.Xoption[verb][option_key] = code
+	e.Xoption[opt.Verb][opt.OptionKey] = opt.Code
 }
 
 func (e *Esmtp) SubReply(verb string, code string) error {
