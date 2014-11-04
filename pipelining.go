@@ -1,4 +1,4 @@
-package mailserver
+package smtpserver
 
 type Pipelining struct {
 	*Extension

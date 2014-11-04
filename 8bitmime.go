@@ -1,4 +1,4 @@
-package mailserver
+package smtpserver
 
 type Bit8mime struct {
 	*Extension
