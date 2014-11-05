@@ -1,9 +1,10 @@
 package smtpserver
 
 type Pipelining struct {
-	*Extension
-	OldProcessOperation
-	OldHandleMore
+	Extension
+	OldProcessOperation string
+	OldHandleMore       string
+	Parent              interface{}
 }
 
 var GROUP_COMMANDS []string

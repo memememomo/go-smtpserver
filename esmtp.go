@@ -2,11 +2,15 @@ package smtpserver
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Esmtp struct {
 	*Smtp
 	ExtendMode bool
+	Extensions []Extension
+	Xoption    map[string]map[string]interface{}
+	Xreply     map[string][]func(string, *Reply) (int, string)
 }
 
 type SubOption struct {
@@ -26,21 +30,21 @@ func (e *Esmtp) GetProtoname() string {
 	return "ESMTP"
 }
 
-func (e *Esmtp) GetExtensions() {
+func (e *Esmtp) GetExtensions() []Extension {
 	return e.Extensions
 }
 
-func (e *Esmtp) Register(extend *Extension) bool {
-	for _, verb_def := range extend.Verb() {
-		e.DefVerb(verb_def)
+func (e *Esmtp) Register(extend Extension) bool {
+	for verb, code := range extend.Verb() {
+		e.DefVerb(verb, code)
 	}
 
-	for _, option_def := range extend.Option {
+	for _, option_def := range extend.Option() {
 		e.SubOption(option_def)
 	}
 
-	for _, reply_def := range extend.Reply {
-		e.SubReply(reply_def)
+	for verb, code := range extend.Reply() {
+		e.SubReply(verb, code)
 	}
 
 	e.Extensions = append(e.Extensions, extend)
@@ -50,15 +54,16 @@ func (e *Esmtp) Register(extend *Extension) bool {
 
 func (e *Esmtp) SubOption(opt *SubOption) error {
 	if opt.Verb != "MAIL" && opt.Verb != "RCPT" {
-		return fmt.Sprintf("can't subscribe to option for verb '%s'", verb)
+		return fmt.Errorf("can't subscribe to option for verb '%s'", opt.Verb)
 	}
 	if _, exists := e.Xoption[opt.Verb][opt.OptionKey]; exists == true {
-		return fmt.Sprintf("already subscribed '%s'", opt.OptionKey)
+		return fmt.Errorf("already subscribed '%s'", opt.OptionKey)
 	}
 	e.Xoption[opt.Verb][opt.OptionKey] = opt.Code
+	return nil
 }
 
-func (e *Esmtp) SubReply(verb string, code string) error {
+func (e *Esmtp) SubReply(verb string, code func(string, *Reply) (int, string)) error {
 	exists := false
 	for _, l := range e.ListVerb() {
 		if l == verb {
@@ -67,9 +72,8 @@ func (e *Esmtp) SubReply(verb string, code string) error {
 		}
 	}
 	if exists != false {
-		return fmt.Sprintf("trying to subscribe to an unsupported verb '%s'", verb)
+		return fmt.Errorf("trying to subscribe to an unsupported verb '%s'", verb)
 	}
-
 	e.Xreply[verb] = append(e.Xreply[verb], code)
 	return nil
 }
@@ -77,11 +81,13 @@ func (e *Esmtp) SubReply(verb string, code string) error {
 func (e *Esmtp) SetExtendMode(mode bool) {
 	e.ExtendMode = mode
 	for _, extend := range e.Extensions {
-		extend.ExtendMode = mode
+		extend.ExtendMode(mode)
 	}
 }
 
-func (e *Esmtp) Ehlo(hostname string) (close bool) {
+func (e *Esmtp) Ehlo(args ...string) (close bool) {
+	hostname := args[0]
+
 	if len(hostname) > 0 {
 		e.Reply(501, "Syntax error in parameters or arguments")
 		return false
@@ -89,7 +95,7 @@ func (e *Esmtp) Ehlo(hostname string) (close bool) {
 
 	response := e.GetHostname() + " Service ready"
 
-	var extends
+	var extends []interface{}
 	for _, extend := range e.GetExtensions() {
 		extends = append(extends, extend)
 	}
@@ -101,9 +107,9 @@ func (e *Esmtp) Ehlo(hostname string) (close bool) {
 		OnSuccess: func() {
 			// according to the RFC, EHLO ensures "that both the SMTP client
 			// and the SMTP server are in the initial state"
-			e.ReversePath = true
+			e.ReversePath = "0"
 			e.ForwardPath = []string{}
-			e.StepMaildataPath(0)
+			e.StepMaildataPath(false)
 		},
 		SuccessReply: &Reply{Code: 250}, // [$response, @extends]
 	})
@@ -123,7 +129,9 @@ func (e *Esmtp) HandleOptions(verb string, address string, options []string) boo
 	}
 
 	for i := len(options); i >= 0; i-- {
-		key, value := strings.SplitN(options[i], "=", 2)
+		opts := strings.SplitN(options[i], "=", 2)
+		key := opts[0]
+		value := opts[1]
 		handler, ok := e.Xoption[verb][key]
 		if ok {
 			handler(verb, address, key, value)
@@ -138,7 +146,7 @@ func (e *Esmtp) HandleOptions(verb string, address string, options []string) boo
 
 func (e *Esmtp) HandleReply(verb string, reply *Reply) {
 	if _, ok := e.Xreply[verb]; e.ExtendMode && ok {
-		for handler := range e.Xreply[verb] {
+		for _, handler := range e.Xreply[verb] {
 			reply.Code, reply.Message = handler(verb, reply)
 		}
 	}
