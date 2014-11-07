@@ -1,15 +1,15 @@
 package smtpserver
 
 type Pipelining struct {
-	Extension
-	OldProcessOperation string
+	ExtensionBase
+	OldProcessOperation func(operation string) bool
 	OldHandleMore       string
-	Parent              interface{}
+	Parent              *Esmtp
 }
 
 var GROUP_COMMANDS []string
 
-func (p *Pipelining) Init(parent interface{}) interface{} {
+func (p *Pipelining) Init(parent *Esmtp) Extension {
 	GROUP_COMMANDS = []string{"RSET", "MAIL", "SEND", "SOML", "SAML", "RCPT"}
 	p.Parent = parent
 	return p
@@ -18,7 +18,7 @@ func (p *Pipelining) Init(parent interface{}) interface{} {
 func (p *Pipelining) ExtendMode(mode bool) {
 	if mode {
 		p.OldProcessOperation = p.Parent.ProcessOperation
-		p.Parent.ProcessOperation = p.ProcessOperation
+		p.Parent.CurProcessOperation = p.ProcessOperation
 		p.OldHandleMore = p.Parent.DataHandleMoreData
 		p.Parent.DataHandleMoreData = true
 	} else {
@@ -31,7 +31,7 @@ func (p *Pipelining) ExtendMode(mode bool) {
 	}
 }
 
-func (p *Pipelining) ProcessOperation(operation interface{}) {
+func (p *Pipelining) ProcessOperation(operation string) bool {
 	commands := []string{}
 	for i := 0; i <= len(commands); i++ {
 		verb, params := obj.TokenizeCommand(commands[i])

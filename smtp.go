@@ -284,7 +284,7 @@ func (s *Smtp) Data(args ...string) (close bool) {
 // Because data is cutted into pieces (4096 bytes), we have to search
 // "\r\n.\r\n" sequence in 2 consecutive pieces. s.LastChunk
 // contains the last 5 bytes.
-func (s *Smtp) DataPart(m *MailServer, data string) bool {
+func (s *Smtp) DataPart(m Server, data string) bool {
 
 	// search for end of data indicator
 	re, _ := regexp.Compile("\r?\n\\.\r?\n(.*)")
@@ -366,7 +366,7 @@ func (s *Smtp) DataFinished(more_data string) bool {
 
 	// if more data, handle it
 	if len(more_data) > 0 {
-		return s.ProcessOperation(more_data)
+		return s.CurProcessOperation(more_data)
 	} else {
 		return false
 	}

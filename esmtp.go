@@ -9,14 +9,14 @@ type Esmtp struct {
 	*Smtp
 	ExtendMode bool
 	Extensions []Extension
-	Xoption    map[string]map[string]interface{}
+	Xoption    map[string]map[string]func(verb string, address string, key string, value string)
 	Xreply     map[string][]func(string, *Reply) (int, string)
 }
 
 type SubOption struct {
 	Verb      string
 	OptionKey string
-	Code      interface{}
+	Code      func(verb string, address string, key string, value string)
 }
 
 func (e *Esmtp) Init(options *Option) *Esmtp {
@@ -81,7 +81,7 @@ func (e *Esmtp) SubReply(verb string, code func(string, *Reply) (int, string)) e
 func (e *Esmtp) SetExtendMode(mode bool) {
 	e.ExtendMode = mode
 	for _, extend := range e.Extensions {
-		extend.ExtendMode(mode)
+		extend.SetExtendMode(mode)
 	}
 }
 
@@ -103,7 +103,7 @@ func (e *Esmtp) Ehlo(args ...string) (close bool) {
 	e.SetExtendMode(true)
 	e.MakeEvent(&Event{
 		Name:      "EHLO",
-		Arguments: []string{hostname, extends},
+		Arguments: []string{hostname},
 		OnSuccess: func() {
 			// according to the RFC, EHLO ensures "that both the SMTP client
 			// and the SMTP server are in the initial state"

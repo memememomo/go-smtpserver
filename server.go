@@ -9,15 +9,16 @@ import (
 )
 
 type MailServer struct {
-	In           *net.TCPConn
-	Out          *net.TCPConn
-	DoJob        bool
-	Context      string
-	CallbackMap  map[string]*Callback
-	Verb         map[string]func(...string) (close bool)
-	NextInput    func(*MailServer, string) bool
-	Options      *Option
-	BannerString string
+	In                  *net.TCPConn
+	Out                 *net.TCPConn
+	DoJob               bool
+	Context             string
+	CallbackMap         map[string]*Callback
+	Verb                map[string]func(...string) (close bool)
+	NextInput           func(Server, string) bool
+	Options             *Option
+	BannerString        string
+	CurProcessOperation func(string) bool
 }
 
 type Option struct {
@@ -49,21 +50,40 @@ type Callback struct {
 	Context string
 }
 
-func (m *MailServer) Init(options *Option) *MailServer {
+type Server interface {
+	Init(*Option) Server
+	MakeEvent(*Event) int
+	GetDefaultReply(*Reply, int) (code int, msg string)
+	HandleReply(string, *Reply)
+	Callback(string, ...string) *Reply
+	SetCallback(string, func(...string) *Reply, ...string)
+	DefVerb(string, func(...string) bool)
+	UndefVerb(string)
+	ListVerb() []string
+	NextInputTo(func(Server, string) bool) func(Server, string) bool
+	TellNextInputMethod(string) bool
+	Process() bool
+	ProcessOnce(string) bool
+	ProcessOperation(string) bool
+	ProcessCommand(string, string) bool
+	TokenizeCommand(string) (verb string, params string)
+	Reply(int, string)
+	GetHostname() string
+	GetProtoname() string
+	GetAppname() string
+	Banner()
+	Timeout() bool
+}
+
+func (m *MailServer) Init(options *Option) Server {
 	m.Options = options
 
-	if options.HandleIn != nil && options.HandleOut != nil {
-
-	} else if options.Socket != nil {
-		m.In = options.Socket
-		m.Out = options.Socket
-	} else {
-		// m.In = IO::Handle->new->fdopen(fileno(STDIN), "r")
-		// m.Out = IO::Handle->new->fdopen(fileno(STDOUT), "w")
-	}
-
+	m.In = options.Socket
+	m.Out = options.Socket
 	m.CallbackMap = make(map[string]*Callback)
 	m.Verb = make(map[string]func(...string) (close bool))
+
+	m.CurProcessOperation = m.ProcessOperation
 
 	return m
 }
@@ -122,18 +142,15 @@ func (m *MailServer) MakeEvent(e *Event) int {
 	return reply.Success
 }
 
-func (m *MailServer) GetDefaultReply(config *Reply, default_code int) (int, string) {
-	var code int
-	var msg string
-
+func (m *MailServer) GetDefaultReply(config *Reply, default_code int) (code int, msg string) {
 	if config != nil {
 		code = config.Code
 		msg = config.Message
 	} else {
 		code = default_code
+		msg = ""
 	}
-
-	return code, msg
+	return
 }
 
 func (m *MailServer) HandleReply(verb string, reply *Reply) {
@@ -180,7 +197,7 @@ func (m *MailServer) ListVerb() []string {
 	return keys
 }
 
-func (m *MailServer) NextInputTo(method_ref func(*MailServer, string) bool) func(*MailServer, string) bool {
+func (m *MailServer) NextInputTo(method_ref func(Server, string) bool) func(Server, string) bool {
 	if method_ref != nil {
 		m.NextInput = method_ref
 	}
@@ -248,7 +265,7 @@ func (m *MailServer) Process() bool {
 			if m.NextInput != nil {
 				rv = m.TellNextInputMethod(string(chunk))
 			} else {
-				rv = m.ProcessOperation(string(chunk))
+				rv = m.CurProcessOperation(string(chunk))
 			}
 
 			// if rv is defined, we have to close the connection
@@ -278,7 +295,7 @@ func (m *MailServer) ProcessOnce(operation string) bool {
 	if m.NextInput != nil {
 		return m.TellNextInputMethod(operation)
 	} else {
-		return m.ProcessOperation(operation)
+		return m.CurProcessOperation(operation)
 	}
 }
 
@@ -301,7 +318,7 @@ func (m *MailServer) ProcessCommand(verb string, params string) bool {
 	}
 }
 
-func (m *MailServer) TokenizeCommand(line string) (string, string) {
+func (m *MailServer) TokenizeCommand(line string) (verb string, params string) {
 	line = strings.TrimRight(line, "\r\n")
 	line = strings.TrimRight(line, "\n")
 	line = strings.TrimSpace(line)
