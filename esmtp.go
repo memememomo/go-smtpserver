@@ -111,7 +111,7 @@ func (e *Esmtp) Ehlo(args ...string) (close bool) {
 			e.ForwardPath = []string{}
 			e.StepMaildataPath(false)
 		},
-		SuccessReply: &Reply{Code: 250}, // [$response, @extends]
+		SuccessReply: &Reply{Code: 250, Message: response}, //TODO, @extends]
 	})
 
 	return false

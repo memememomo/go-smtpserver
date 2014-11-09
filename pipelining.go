@@ -1,9 +1,13 @@
 package smtpserver
 
+import (
+	"fmt"
+)
+
 type Pipelining struct {
 	ExtensionBase
 	OldProcessOperation func(operation string) bool
-	OldHandleMore       string
+	OldHandleMore       bool
 	Parent              *Esmtp
 }
 
@@ -22,10 +26,10 @@ func (p *Pipelining) ExtendMode(mode bool) {
 		p.OldHandleMore = p.Parent.DataHandleMoreData
 		p.Parent.DataHandleMoreData = true
 	} else {
-		if _, ok := p.OldProcessOperation; ok {
-			p.Parent.ProcessOperation = p.OldProcessOperation
+		if p.OldProcessOperation != nil {
+			p.Parent.CurProcessOperation = p.OldProcessOperation
 		}
-		if _, ok := p.OldHandleMore; ok {
+		if p.OldHandleMore {
 			p.Parent.DataHandleMoreData = p.OldHandleMore
 		}
 	}
@@ -34,7 +38,7 @@ func (p *Pipelining) ExtendMode(mode bool) {
 func (p *Pipelining) ProcessOperation(operation string) bool {
 	commands := []string{}
 	for i := 0; i <= len(commands); i++ {
-		verb, params := obj.TokenizeCommand(commands[i])
+		verb, params := p.Parent.TokenizeCommand(commands[i])
 
 		// Once the client SMTP has confirmed that support exists for
 		// the pipelining extension, the client SMTP may then elect to
@@ -48,11 +52,11 @@ func (p *Pipelining) ProcessOperation(operation string) bool {
 		// which the client SMTP must accommodate. (NOOP is included in
 		// this group so it can be used as a synchronization point.)
 		if i < len(commands) {
-			obj.Reply(550, fmt.Sprintf("Protocol error: '%s' not allowed in a group of commands", verb))
+			p.Parent.Reply(550, fmt.Sprintf("Protocol error: '%s' not allowed in a group of commands", verb))
 			return false
 		}
 
-		return obj.ProcessCommand(verb, params)
+		return p.Parent.ProcessCommand(verb, params)
 	}
 
 	return false
