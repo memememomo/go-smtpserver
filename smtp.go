@@ -11,7 +11,7 @@ type Smtp struct {
 	ReversePath        string
 	ForwardPath        []string
 	MaildataPath       bool
-	_Data              string
+	DataBuf            string
 	DataHandleMoreData bool
 	LastChunk          string
 }
@@ -48,7 +48,7 @@ func (s *Smtp) Init(options *Option) *Smtp {
 func (s *Smtp) StepMaildataPath(b bool) bool {
 	s.MaildataPath = b
 	if b == false {
-		s._Data = ""
+		s.DataBuf = ""
 	}
 	return s.MaildataPath
 }
@@ -311,7 +311,7 @@ func (s *Smtp) DataPart(m *MailServer, data string) bool {
 		}
 		data = re.ReplaceAllStringFunc(data, cb)
 
-		s._Data += data
+		s.DataBuf += data
 
 		// RFC 2821 by the letter
 		re, _ = regexp.Compile("^\\.(.+\015\012)(.)?")
@@ -323,7 +323,7 @@ func (s *Smtp) DataPart(m *MailServer, data string) bool {
 				return s
 			}
 		}
-		s._Data = re.ReplaceAllStringFunc(s._Data, cb)
+		s.DataBuf = re.ReplaceAllStringFunc(s.DataBuf, cb)
 
 		return s.DataFinished(more_data)
 	}
@@ -341,7 +341,7 @@ func (s *Smtp) DataPart(m *MailServer, data string) bool {
 		Name:      "DATA-PART",
 		Arguments: []string{data},
 		OnSuccess: func() {
-			s._Data += data
+			s.DataBuf += data
 
 			// please, recall me soon !
 			s.NextInputTo(s.DataPart)
@@ -355,7 +355,7 @@ func (s *Smtp) DataPart(m *MailServer, data string) bool {
 func (s *Smtp) DataFinished(more_data string) bool {
 	s.MakeEvent(&Event{
 		Name:         "DATA",
-		Arguments:    []string{s._Data},
+		Arguments:    []string{s.DataBuf},
 		SuccessReply: &Reply{Code: 250, Message: "message sent"},
 	})
 
