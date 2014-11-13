@@ -12,6 +12,7 @@ type Extension interface {
 
 type ExtensionBase struct {
 	ExtendMode bool
+	Parent     *Esmtp
 }
 
 func (e *ExtensionBase) Init(s *Esmtp) Extension {

@@ -15,7 +15,7 @@ type MailServer struct {
 	Context             string
 	CallbackMap         map[string]*Callback
 	Verb                map[string]func(...string) (close bool)
-	NextInput           func(Server, string) bool
+	NextInput           func(string) bool
 	Options             *Option
 	BannerString        string
 	CurProcessOperation func(string) bool
@@ -50,32 +50,7 @@ type Callback struct {
 	Context string
 }
 
-type Server interface {
-	Init(*Option) Server
-	MakeEvent(*Event) int
-	GetDefaultReply(*Reply, int) (code int, msg string)
-	HandleReply(string, *Reply)
-	Callback(string, ...string) *Reply
-	SetCallback(string, func(...string) *Reply, ...string)
-	DefVerb(string, func(...string) bool)
-	UndefVerb(string)
-	ListVerb() []string
-	NextInputTo(func(Server, string) bool) func(Server, string) bool
-	TellNextInputMethod(string) bool
-	Process() bool
-	ProcessOnce(string) bool
-	ProcessOperation(string) bool
-	ProcessCommand(string, string) bool
-	TokenizeCommand(string) (verb string, params string)
-	Reply(int, string)
-	GetHostname() string
-	GetProtoname() string
-	GetAppname() string
-	Banner()
-	Timeout() bool
-}
-
-func (m *MailServer) Init(options *Option) Server {
+func (m *MailServer) Init(options *Option) *MailServer {
 	m.Options = options
 
 	m.In = options.Socket
@@ -197,7 +172,7 @@ func (m *MailServer) ListVerb() []string {
 	return keys
 }
 
-func (m *MailServer) NextInputTo(method_ref func(Server, string) bool) func(Server, string) bool {
+func (m *MailServer) NextInputTo(method_ref func(string) bool) func(string) bool {
 	if method_ref != nil {
 		m.NextInput = method_ref
 	}
@@ -209,7 +184,7 @@ func (m *MailServer) TellNextInputMethod(input string) bool {
 	// before calling the code, because code can resetup this variable.
 	code := m.NextInput
 	m.NextInput = nil
-	rv := code(m, input)
+	rv := code(input)
 	return rv
 }
 

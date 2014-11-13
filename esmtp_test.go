@@ -11,11 +11,8 @@ import (
 	"time"
 )
 
-var queue []string
-
-func TestMain(t *testing.T) {
-
-	smtpd := func(port int) {
+func TestEsmtpMain(t *testing.T) {
+	esmtpd := func(port int) {
 		addr, err := net.ResolveTCPAddr("tcp", "localhost:"+strconv.Itoa(port))
 		if err != nil {
 			panic(err)
@@ -27,30 +24,36 @@ func TestMain(t *testing.T) {
 
 		for {
 			conn, err := listener.AcceptTCP()
-
 			if err != nil {
 				log.Printf("Accept Error: %v\n", err)
 				continue
 			}
 
-			smtp := &Smtp{
-				&MailServer{},
-				"",
-				[]string{},
+			esmtp := &Esmtp{
+				&Smtp{
+					&MailServer{},
+					"",
+					[]string{},
+					false,
+					"",
+					false,
+					"",
+				},
 				false,
-				"",
-				false,
-				"",
+				[]Extension{},
+				make(map[string]map[string]func(verb string, address string, key string, value string)),
+				make(map[string][]func(string, *Reply) (int, string)),
 			}
-			smtp = smtp.Init(&Option{Socket: conn})
-			smtp.SetCallback("RCPT", smtp.ValidateRecipient)
-			smtp.SetCallback("DATA", smtp.QueueMessage)
-			smtp.Process()
+			esmtp.Init(&Option{Socket: conn})
+			esmtp.Register(&Pipelining{})
+			esmtp.SetCallback("RCPT", esmtp.ValidateRecipient)
+			esmtp.SetCallback("DATA", esmtp.QueueMessage)
+			esmtp.Process()
 			conn.Close()
 		}
 	}
 
-	server, err := tcptest.Start(smtpd, 30*time.Second)
+	server, err := tcptest.Start(esmtpd, 30*time.Second)
 	if err != nil {
 		t.Error("Failed to start smtpserver: %s", err)
 	}
@@ -99,7 +102,7 @@ func TestMain(t *testing.T) {
 	}
 }
 
-func (s *Smtp) ValidateRecipient(args ...string) *Reply {
+func (s *Esmtp) ValidateRecipient(args ...string) *Reply {
 	local_domains := []string{"example.com", "example.org"}
 	recipient := args[0]
 
@@ -130,7 +133,7 @@ func (s *Smtp) ValidateRecipient(args ...string) *Reply {
 	return &Reply{1, -1, ""}
 }
 
-func (s *Smtp) QueueMessage(args ...string) *Reply {
+func (s *Esmtp) QueueMessage(args ...string) *Reply {
 	data := args[0]
 	sender := s.GetSender()
 	recipients := s.GetRecipients()
@@ -147,7 +150,7 @@ func (s *Smtp) QueueMessage(args ...string) *Reply {
 	return &Reply{1, 250, fmt.Sprintf("message queued %d", msgid)}
 }
 
-func (s *Smtp) AddQueue(sender string, recipients []string, data string) int {
+func (s *Esmtp) AddQueue(sender string, recipients []string, data string) int {
 	queue = append(queue, data)
 	return 1
 }

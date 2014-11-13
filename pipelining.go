@@ -8,7 +8,6 @@ type Pipelining struct {
 	ExtensionBase
 	OldProcessOperation func(operation string) bool
 	OldHandleMore       bool
-	Parent              *Esmtp
 }
 
 var GROUP_COMMANDS []string
