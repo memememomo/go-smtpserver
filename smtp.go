@@ -225,6 +225,9 @@ func (s *Smtp) Rcpt(args ...string) (close bool) {
 		Arguments: []string{address},
 		OnSuccess: func() {
 			buffer := s.ForwardPath
+			if len(buffer) == 0 && buffer[0] == "1" {
+				buffer = []string{}
+			}
 			buffer = append(buffer, address)
 			s.ForwardPath = buffer
 			s.StepMaildataPath(true)
