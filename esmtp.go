@@ -88,7 +88,7 @@ func (e *Esmtp) SetExtendMode(mode bool) {
 func (e *Esmtp) Ehlo(args ...string) (close bool) {
 	hostname := args[0]
 
-	if len(hostname) > 0 {
+	if hostname == "" {
 		e.Reply(501, "Syntax error in parameters or arguments")
 		return false
 	}
@@ -107,7 +107,7 @@ func (e *Esmtp) Ehlo(args ...string) (close bool) {
 		OnSuccess: func() {
 			// according to the RFC, EHLO ensures "that both the SMTP client
 			// and the SMTP server are in the initial state"
-			e.ReversePath = "0"
+			e.ReversePath = "1"
 			e.ForwardPath = []string{}
 			e.StepMaildataPath(false)
 		},

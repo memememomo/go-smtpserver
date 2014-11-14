@@ -67,9 +67,9 @@ func TestEsmtpMain(t *testing.T) {
 		t.Error("Wrong Connection Response: " + res)
 	}
 
-	fmt.Fprintf(conn, "HELO localhost\r\n")
-	if res := ReadIO(conn); res != "250 Requested mail action okey, completed\r\n" {
-		t.Error("Wrong HELO Response: " + res)
+	fmt.Fprintf(conn, "EHLO localhost\r\n")
+	if res := ReadIO(conn); MatchRegex(".+? Service ready", res) != true {
+		t.Error("Wrong EHLO Response: " + res)
 	}
 
 	fmt.Fprintf(conn, "MAIL FROM: <from@example.net>\r\n")
