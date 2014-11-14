@@ -2,7 +2,7 @@ package smtpserver
 
 type Extension interface {
 	Init(*Esmtp) Extension
-	Verb() map[string]func(...string) (close bool)
+	Verb() map[string]func(interface{}, ...string) (close bool)
 	Keyword() string
 	Parameter() []string
 	Option() []*SubOption
@@ -19,7 +19,7 @@ func (e *ExtensionBase) Init(s *Esmtp) Extension {
 	return e
 }
 
-func (e *ExtensionBase) Verb() map[string]func(...string) (close bool) {
+func (e *ExtensionBase) Verb() map[string]func(interface{}, ...string) (close bool) {
 	return nil
 }
 

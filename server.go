@@ -14,7 +14,7 @@ type MailServer struct {
 	DoJob               bool
 	Context             string
 	CallbackMap         map[string]*Callback
-	Verb                map[string]func(...string) (close bool)
+	Verb                map[string]func(interface{}, ...string) (close bool)
 	NextInput           func(string) bool
 	Options             *Option
 	BannerString        string
@@ -56,7 +56,7 @@ func (m *MailServer) Init(options *Option) *MailServer {
 	m.In = options.Socket
 	m.Out = options.Socket
 	m.CallbackMap = make(map[string]*Callback)
-	m.Verb = make(map[string]func(...string) (close bool))
+	m.Verb = make(map[string]func(interface{}, ...string) (close bool))
 
 	m.CurProcessOperation = m.ProcessOperation
 
@@ -154,7 +154,7 @@ func (m *MailServer) SetCallback(name string, code func(...string) *Reply, conte
 	m.CallbackMap[name] = cb
 }
 
-func (m *MailServer) DefVerb(verb string, cb func(...string) bool) {
+func (m *MailServer) DefVerb(verb string, cb func(interface{}, ...string) bool) {
 	m.Verb[strings.ToUpper(verb)] = cb
 }
 
@@ -286,11 +286,15 @@ func (m *MailServer) ProcessOperation(operation string) bool {
 
 func (m *MailServer) ProcessCommand(verb string, params string) bool {
 	if action, ok := m.Verb[verb]; ok {
-		return action(params)
+		return m.ExecAction(action, params)
 	} else {
 		m.Reply(500, "Syntax error: unrecognized command")
 		return false
 	}
+}
+
+func (m *MailServer) ExecAction(action func(interface{}, ...string) (close bool), params string) bool {
+	return action(m, params)
 }
 
 func (m *MailServer) TokenizeCommand(line string) (verb string, params string) {

@@ -85,7 +85,7 @@ func (e *Esmtp) SetExtendMode(mode bool) {
 	}
 }
 
-func (e *Esmtp) Ehlo(args ...string) (close bool) {
+func (e *Esmtp) Ehlo(obj interface{}, args ...string) (close bool) {
 	hostname := args[0]
 
 	if hostname == "" {
