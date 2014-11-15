@@ -136,8 +136,7 @@ func (m *MailServer) HandleReply(verb string, reply *Reply) {
 }
 
 func (m *MailServer) Callback(name string, args ...string) *Reply {
-	if _, ok := m.CallbackMap[name]; ok == true {
-		cb := m.CallbackMap[name]
+	if cb, ok := m.CallbackMap[name]; ok == true {
 		m.Context = cb.Context
 		reply := cb.Code(args...)
 		return reply

@@ -1,6 +1,7 @@
 package smtpserver
 
 import (
+	"crypto/tls"
 	"fmt"
 	"strings"
 )
@@ -11,12 +12,18 @@ type Esmtp struct {
 	Extensions []Extension
 	Xoption    map[string]map[string]func(verb string, address string, key string, value string)
 	Xreply     map[string][]func(string, *Reply) (int, string)
+	Options    EsmtpOption
 }
 
 type SubOption struct {
 	Verb      string
 	OptionKey string
 	Code      func(verb string, address string, key string, value string)
+}
+
+type EsmtpOption struct {
+	Option
+	Ssl *tls.Config
 }
 
 func (e *Esmtp) Init(options *Option) *Esmtp {
