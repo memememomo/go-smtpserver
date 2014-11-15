@@ -61,6 +61,9 @@ func (e *Esmtp) SubOption(opt *SubOption) error {
 	if _, exists := e.Xoption[opt.Verb][opt.OptionKey]; exists == true {
 		return fmt.Errorf("already subscribed '%s'", opt.OptionKey)
 	}
+	if e.Xoption[opt.Verb] == nil {
+		e.Xoption[opt.Verb] = make(map[string]func(verb string, address string, key string, value string))
+	}
 	e.Xoption[opt.Verb][opt.OptionKey] = opt.Code
 	return nil
 }

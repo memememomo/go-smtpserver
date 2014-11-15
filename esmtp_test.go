@@ -32,6 +32,7 @@ func TestEsmtpMain(t *testing.T) {
 			esmtp := &Esmtp{}
 			esmtp.Init(&Option{Socket: conn})
 			esmtp.Register(&Pipelining{})
+			esmtp.Register(&Bit8mime{})
 			esmtp.SetCallback("RCPT", esmtp.ValidateRecipient)
 			esmtp.SetCallback("DATA", esmtp.QueueMessage)
 			esmtp.Process()

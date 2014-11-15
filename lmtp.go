@@ -14,10 +14,8 @@ func (l *Lmtp) Init(options *Option) *Lmtp {
 	l.UndefVerb("EHLO")
 	l.DefVerb("LHLO", l.Lhlo)
 
-	pipelining := &Pipelining{}
-
 	// Required by RFC
-	l.Register(pipelining)
+	l.Register(&Pipelining{})
 
 	return l
 }
