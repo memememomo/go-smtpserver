@@ -7,7 +7,7 @@ import (
 )
 
 type Smtp struct {
-	*MailServer
+	MailServer
 	ReversePath        string
 	ForwardPath        []string
 	MaildataPath       bool
