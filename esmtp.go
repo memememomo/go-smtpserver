@@ -6,7 +6,7 @@ import (
 )
 
 type Esmtp struct {
-	*Smtp
+	Smtp
 	ExtendMode bool
 	Extensions []Extension
 	Xoption    map[string]map[string]func(verb string, address string, key string, value string)
@@ -23,6 +23,8 @@ func (e *Esmtp) Init(options *Option) *Esmtp {
 	e.Smtp.Init(options)
 	e.DefVerb("EHLO", e.Ehlo)
 	e.ExtendMode = false
+	e.Xoption = make(map[string]map[string]func(verb string, address string, key string, value string))
+	e.Xreply = make(map[string][]func(string, *Reply) (int, string))
 	return e
 }
 

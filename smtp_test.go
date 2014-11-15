@@ -148,7 +148,6 @@ func TestMain(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 func (s *Smtp) ValidateRecipient(args ...string) *Reply {
 	local_domains := []string{"example.com", "example.org"}
 	recipient := args[0]

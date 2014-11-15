@@ -29,21 +29,7 @@ func TestEsmtpMain(t *testing.T) {
 				continue
 			}
 
-			esmtp := &Esmtp{
-				&Smtp{
-					&MailServer{},
-					"",
-					[]string{},
-					false,
-					"",
-					false,
-					"",
-				},
-				false,
-				[]Extension{},
-				make(map[string]map[string]func(verb string, address string, key string, value string)),
-				make(map[string][]func(string, *Reply) (int, string)),
-			}
+			esmtp := &Esmtp{}
 			esmtp.Init(&Option{Socket: conn})
 			esmtp.Register(&Pipelining{})
 			esmtp.SetCallback("RCPT", esmtp.ValidateRecipient)
