@@ -95,11 +95,6 @@ func (e *Esmtp) Ehlo(obj interface{}, args ...string) (close bool) {
 
 	response := e.GetHostname() + " Service ready"
 
-	var extends []interface{}
-	for _, extend := range e.GetExtensions() {
-		extends = append(extends, extend)
-	}
-
 	e.SetExtendMode(true)
 	e.MakeEvent(&Event{
 		Name:      "EHLO",
@@ -111,7 +106,7 @@ func (e *Esmtp) Ehlo(obj interface{}, args ...string) (close bool) {
 			e.ForwardPath = []string{}
 			e.StepMaildataPath(false)
 		},
-		SuccessReply: &Reply{Code: 250, Message: response}, //TODO, @extends]
+		SuccessReply: &Reply{Code: 250, Message: response},
 	})
 
 	return false

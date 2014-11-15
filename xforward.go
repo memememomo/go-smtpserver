@@ -50,8 +50,8 @@ func (x *Xforward) XforwardFunc(obj interface{}, args ...string) (close bool) {
 				Arguments: []string{x.GetForwardedName(), x.GetForwardedAddress(), x.GetForwardedProto(), x.GetForwardedHelo(), x.GetForwardedSource()},
 				OnSuccess: func() {
 				},
-				SuccessReply: &Reply{1, 250, "OK"},
-				FailureReply: &Reply{0, 550, "Failure"},
+				SuccessReply: &Reply{Code: 250, Message: "OK"},
+				FailureReply: &Reply{Code: 550, Message: "Failure"},
 			})
 		}
 	}
@@ -81,5 +81,3 @@ func (x *Xforward) GetForwardedHelo() string {
 func (x *Xforward) GetForwardedSource() string {
 	return x.XforwardValue["source"]
 }
-
-// TODO: New subroutines in Esmtp space
