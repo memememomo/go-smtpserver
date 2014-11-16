@@ -14,6 +14,7 @@ type Smtp struct {
 	DataBuf            string
 	DataHandleMoreData bool
 	LastChunk          string
+	OptionHandler      func(string, string, []string) bool
 }
 
 func (s *Smtp) Init(options *Option) *Smtp {
@@ -41,6 +42,8 @@ func (s *Smtp) Init(options *Option) *Smtp {
 
 	// handle data after the end of data indicator (.)
 	s.DataHandleMoreData = false
+
+	s.OptionHandler = s.HandleOptions
 
 	return s
 }
@@ -152,7 +155,8 @@ func (s *Smtp) Mail(obj interface{}, args ...string) (close bool) {
 		s.Reply(501, "Syntax error in parameters or arguments")
 		return false
 	}
-	args[0] = re.ReplaceAllString(strings.ToLower(args[0]), "")
+	index := re.FindStringIndex(strings.ToLower(args[0]))
+	args[0] = args[0][index[1]:]
 
 	if len(s.ForwardPath) > 0 {
 		s.Reply(503, "Bad sequence of commands")
@@ -168,11 +172,11 @@ func (s *Smtp) Mail(obj interface{}, args ...string) (close bool) {
 	address := rets[0][1]
 
 	var options []string
-	if len(rets) > 1 {
-		options = strings.Split(rets[1][1], " ")
+	if len(rets[0]) > 1 {
+		options = strings.Split(rets[0][2], " ")
 	}
 
-	if s.HandleOptions("Mail", address, options) == false {
+	if s.OptionHandler("MAIL", address, options) == false {
 		return false
 	}
 
@@ -216,7 +220,7 @@ func (s *Smtp) Rcpt(obj interface{}, args ...string) (close bool) {
 		options = strings.Split(rets[1][1], " ")
 	}
 
-	if s.HandleOptions("RCPT", address, options) == false {
+	if s.OptionHandler("RCPT", address, options) == false {
 		return false
 	}
 

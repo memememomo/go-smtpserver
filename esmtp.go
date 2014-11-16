@@ -32,6 +32,7 @@ func (e *Esmtp) Init(options *Option) *Esmtp {
 	e.ExtendMode = false
 	e.Xoption = make(map[string]map[string]func(verb string, address string, key string, value string))
 	e.Xreply = make(map[string][]func(string, *Reply) (int, string))
+	e.OptionHandler = e.HandleOptions
 	return e
 }
 
@@ -135,7 +136,7 @@ func (e *Esmtp) HandleOptions(verb string, address string, options []string) boo
 		return false
 	}
 
-	for i := len(options); i >= 0; i-- {
+	for i := len(options) - 1; i >= 0; i-- {
 		opts := strings.SplitN(options[i], "=", 2)
 		key := opts[0]
 		value := opts[1]
