@@ -13,6 +13,7 @@ import (
 
 type MySmtp struct {
 	Smtp
+	Queue []string
 }
 
 func (s *MySmtp) ValidateRecipient(args ...string) *Reply {
@@ -64,13 +65,12 @@ func (s *MySmtp) QueueMessage(args ...string) *Reply {
 }
 
 func (s *MySmtp) AddQueue(sender string, recipients []string, data string) int {
-	queue = append(queue, data)
+	s.Queue = append(s.Queue, data)
 	return 1
 }
 
-var queue []string
-
 func TestMain(t *testing.T) {
+	smtp := &MySmtp{}
 
 	smtpd := func(port int) {
 		addr, err := net.ResolveTCPAddr("tcp", "localhost:"+strconv.Itoa(port))
@@ -90,7 +90,6 @@ func TestMain(t *testing.T) {
 				continue
 			}
 
-			smtp := &MySmtp{}
 			smtp.Init(&Option{Socket: conn})
 			smtp.SetCallback("RCPT", smtp.ValidateRecipient)
 			smtp.SetCallback("DATA", smtp.QueueMessage)
@@ -143,60 +142,7 @@ func TestMain(t *testing.T) {
 		t.Error("Wrong QUIT Response: " + res)
 	}
 
-	if queue[0] != "From: from@example.net\r\nTo: to@example.com\r\nSubject: Test Mail\r\n\r\nThis is test mail.\r\n" {
-		t.Error("Wrong data in queue: " + queue[0])
+	if smtp.Queue[0] != "From: from@example.net\r\nTo: to@example.com\r\nSubject: Test Mail\r\n\r\nThis is test mail.\r\n" {
+		t.Error("Wrong data in queue: " + smtp.Queue[0])
 	}
-}
-
-func (s *Smtp) ValidateRecipient(args ...string) *Reply {
-	local_domains := []string{"example.com", "example.org"}
-	recipient := args[0]
-
-	re, _ := regexp.Compile("@(.*)\\s*$")
-	var domain string
-
-	if re.MatchString(recipient) {
-		rets := re.FindStringSubmatch(recipient)
-		domain = rets[1]
-	}
-
-	if domain == "" {
-		return &Reply{0, 513, "Syntax error."}
-	}
-
-	var valid = false
-	for i := 0; i < len(local_domains); i++ {
-		if domain == local_domains[i] {
-			valid = true
-			break
-		}
-	}
-
-	if valid == false {
-		return &Reply{0, 554, fmt.Sprintf("%s: Recipient address rejected: Relay access denied", recipient)}
-	}
-
-	return &Reply{1, -1, ""}
-}
-
-func (s *Smtp) QueueMessage(args ...string) *Reply {
-	data := args[0]
-	sender := s.GetSender()
-	recipients := s.GetRecipients()
-
-	if len(recipients) == 0 {
-		return &Reply{0, 554, "Error: no valid recipients"}
-	}
-
-	msgid := s.AddQueue(sender, recipients, data)
-	if msgid == 0 {
-		return &Reply{0, -1, ""}
-	}
-
-	return &Reply{1, 250, fmt.Sprintf("message queued %d", msgid)}
-}
-
-func (s *Smtp) AddQueue(sender string, recipients []string, data string) int {
-	queue = append(queue, data)
-	return 1
 }

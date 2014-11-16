@@ -136,10 +136,17 @@ func (e *Esmtp) HandleOptions(verb string, address string, options []string) boo
 		return false
 	}
 
+	if len(options) == 0 {
+		return true
+	}
+
 	for i := len(options) - 1; i >= 0; i-- {
 		opts := strings.SplitN(options[i], "=", 2)
-		key := opts[0]
-		value := opts[1]
+		var key, value string
+		key = opts[0]
+		if len(opts) == 2 {
+			value = opts[1]
+		}
 		handler, ok := e.Xoption[verb][key]
 		if ok {
 			handler(verb, address, key, value)

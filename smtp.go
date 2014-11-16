@@ -172,7 +172,7 @@ func (s *Smtp) Mail(obj interface{}, args ...string) (close bool) {
 	address := rets[0][1]
 
 	var options []string
-	if len(rets[0]) > 1 {
+	if len(rets[0]) > 1 && rets[0][2] != "" {
 		options = strings.Split(rets[0][2], " ")
 	}
 
