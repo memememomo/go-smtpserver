@@ -45,6 +45,8 @@ func (e *Esmtp) GetExtensions() []Extension {
 }
 
 func (e *Esmtp) Register(extend Extension) bool {
+	extend.Init(e)
+
 	for verb, code := range extend.Verb() {
 		e.DefVerb(verb, code)
 	}

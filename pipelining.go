@@ -2,6 +2,7 @@ package smtpserver
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Pipelining struct {
@@ -18,9 +19,9 @@ func (p *Pipelining) Init(parent *Esmtp) Extension {
 	return p
 }
 
-func (p *Pipelining) ExtendMode(mode bool) {
+func (p *Pipelining) SetExtendMode(mode bool) {
 	if mode {
-		p.OldProcessOperation = p.Parent.ProcessOperation
+		p.OldProcessOperation = p.Parent.CurProcessOperation
 		p.Parent.CurProcessOperation = p.ProcessOperation
 		p.OldHandleMore = p.Parent.DataHandleMoreData
 		p.Parent.DataHandleMoreData = true
@@ -35,8 +36,9 @@ func (p *Pipelining) ExtendMode(mode bool) {
 }
 
 func (p *Pipelining) ProcessOperation(operation string) bool {
-	commands := []string{}
-	for i := 0; i <= len(commands); i++ {
+	commands := p.SplitOperation(operation)
+
+	for i := 0; i < len(commands); i++ {
 		verb, params := p.Parent.TokenizeCommand(commands[i])
 
 		// Once the client SMTP has confirmed that support exists for
@@ -50,14 +52,40 @@ func (p *Pipelining) ProcessOperation(operation string) bool {
 		// since their success or failure produces a change of state
 		// which the client SMTP must accommodate. (NOOP is included in
 		// this group so it can be used as a synchronization point.)
-		if i < len(commands) {
+		if i < len(commands)-1 && p.IsAllowed(verb) != true {
 			p.Parent.Reply(550, fmt.Sprintf("Protocol error: '%s' not allowed in a group of commands", verb))
 			return false
 		}
 
-		return p.Parent.ProcessCommand(verb, params)
+		rv := p.Parent.ProcessCommand(verb, params)
+		if rv {
+			return rv
+		}
 	}
 
+	return false
+}
+
+func (p *Pipelining) SplitOperation(operation string) []string {
+	cmds := strings.Split(operation, "\n")
+
+	var commands []string
+	for i := 0; i < len(cmds); i++ {
+		c := strings.TrimRight(cmds[i], "\r")
+		if c != "" {
+			commands = append(commands, c)
+		}
+	}
+
+	return commands
+}
+
+func (p *Pipelining) IsAllowed(command string) bool {
+	for _, g := range GROUP_COMMANDS {
+		if command == g {
+			return true
+		}
+	}
 	return false
 }
 
