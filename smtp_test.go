@@ -1,76 +1,18 @@
 package smtpserver
 
 import (
+	. "./testutil"
 	"fmt"
 	"github.com/lestrrat/go-tcptest"
 	"log"
 	"net"
-	"regexp"
 	"strconv"
 	"testing"
 	"time"
 )
 
-type MySmtp struct {
-	Smtp
-	Queue []string
-}
-
-func (s *MySmtp) ValidateRecipient(args ...string) *Reply {
-	local_domains := []string{"example.com", "example.org"}
-	recipient := args[0]
-
-	re, _ := regexp.Compile("@(.*)\\s*$")
-	var domain string
-
-	if re.MatchString(recipient) {
-		rets := re.FindStringSubmatch(recipient)
-		domain = rets[1]
-	}
-
-	if domain == "" {
-		return &Reply{0, 513, "Syntax error."}
-	}
-
-	var valid = false
-	for i := 0; i < len(local_domains); i++ {
-		if domain == local_domains[i] {
-			valid = true
-			break
-		}
-	}
-
-	if valid == false {
-		return &Reply{0, 554, fmt.Sprintf("%s: Recipient address rejected: Relay access denied", recipient)}
-	}
-
-	return &Reply{1, -1, ""}
-}
-
-func (s *MySmtp) QueueMessage(args ...string) *Reply {
-	data := args[0]
-	sender := s.GetSender()
-	recipients := s.GetRecipients()
-
-	if len(recipients) == 0 {
-		return &Reply{0, 554, "Error: no valid recipients"}
-	}
-
-	msgid := s.AddQueue(sender, recipients, data)
-	if msgid == 0 {
-		return &Reply{0, -1, ""}
-	}
-
-	return &Reply{1, 250, fmt.Sprintf("message queued %d", msgid)}
-}
-
-func (s *MySmtp) AddQueue(sender string, recipients []string, data string) int {
-	s.Queue = append(s.Queue, data)
-	return 1
-}
-
-func TestMain(t *testing.T) {
-	smtp := &MySmtp{}
+func TestSmtpMain(t *testing.T) {
+	smtp := &MySmtpServer{}
 
 	smtpd := func(port int) {
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))

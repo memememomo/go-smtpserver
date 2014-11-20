@@ -1,4 +1,4 @@
-package smtpserver
+package testutil
 
 import (
 	"bufio"
