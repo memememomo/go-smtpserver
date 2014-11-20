@@ -9,8 +9,8 @@ import (
 )
 
 type MailServer struct {
-	In                  *net.TCPConn
-	Out                 *net.TCPConn
+	In                  net.Conn
+	Out                 net.Conn
 	DoJob               bool
 	Context             string
 	CallbackMap         map[string]*Callback
@@ -22,9 +22,9 @@ type MailServer struct {
 }
 
 type Option struct {
-	HandleIn       *net.TCPConn
-	HandleOut      *net.TCPConn
-	Socket         *net.TCPConn
+	HandleIn       net.Conn
+	HandleOut      net.Conn
+	Socket         net.Conn
 	ErrorSleepTime int
 	IdleTimeout    int
 }
@@ -202,7 +202,7 @@ func (m *MailServer) Process() bool {
 
 		go func() {
 			var err error
-			read_size, err = in.Read(buffer)
+			read_size, err = in.(*net.TCPConn).Read(buffer)
 			if err != nil {
 				ch <- 0
 				return
@@ -212,7 +212,7 @@ func (m *MailServer) Process() bool {
 		if m.Options.IdleTimeout > 0 {
 			go func() {
 				time.Sleep(time.Second * time.Duration(m.Options.IdleTimeout))
-				in.Close()
+				in.(*net.TCPConn).Close()
 				ch <- 0
 			}()
 		}

@@ -73,17 +73,13 @@ func TestMain(t *testing.T) {
 	smtp := &MySmtp{}
 
 	smtpd := func(port int) {
-		addr, err := net.ResolveTCPAddr("tcp", "localhost:"+strconv.Itoa(port))
-		if err != nil {
-			panic(err)
-		}
-		listener, err := net.ListenTCP("tcp", addr)
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 		if err != nil {
 			panic(err)
 		}
 
 		for {
-			conn, err := listener.AcceptTCP()
+			conn, err := listener.Accept()
 
 			if err != nil {
 				log.Printf("Accept Error: %v\n", err)

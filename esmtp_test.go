@@ -70,7 +70,7 @@ func (s *MyServer) AddQueue(sender string, recipients []string, data string) int
 }
 
 func TestEsmtpMain(t *testing.T) {
-	esmtp, esmtpd := PrepareServer()
+	esmtp, esmtpd, fin := PrepareServer()
 
 	server, err := tcptest.Start(esmtpd, 30*time.Second)
 	if err != nil {
@@ -120,10 +120,12 @@ func TestEsmtpMain(t *testing.T) {
 	if esmtp.Queue[0] != "From: from@example.net\r\nTo: to@example.com\r\nSubject: Test Mail\r\n\r\nThis is test mail.\r\n" {
 		t.Error("Wrong data in queue: " + esmtp.Queue[0])
 	}
+	fin <- 1
+	server.Wait()
 }
 
 func Test8bitmimeInvalid(t *testing.T) {
-	_, esmtpd := PrepareServer()
+	_, esmtpd, fin := PrepareServer()
 
 	server, err := tcptest.Start(esmtpd, 30*time.Second)
 	if err != nil {
@@ -149,10 +151,13 @@ func Test8bitmimeInvalid(t *testing.T) {
 	if res := ReadIO(conn); MatchRegex("555 Unsupported option: BODY=8BITMIME", res) != true {
 		t.Error("Wrong MAIL FROM Response: " + res)
 	}
+
+	fin <- 1
+	server.Wait()
 }
 
 func Test8bitmimeValid(t *testing.T) {
-	esmtp, esmtpd := PrepareServer()
+	esmtp, esmtpd, fin := PrepareServer()
 
 	server, err := tcptest.Start(esmtpd, 30*time.Second)
 	if err != nil {
@@ -202,10 +207,13 @@ func Test8bitmimeValid(t *testing.T) {
 	if esmtp.Queue[0] != "From: from@example.net\r\nTo: to@example.com\r\nSubject: Test Mail\r\n\r\nこれはテストメールです。\r\n" {
 		t.Error("Wrong data in queue: " + esmtp.Queue[0])
 	}
+
+	fin <- 1
+	server.Wait()
 }
 
 func TestPipelining(t *testing.T) {
-	esmtp, esmtpd := PrepareServer()
+	esmtp, esmtpd, fin := PrepareServer()
 
 	server, err := tcptest.Start(esmtpd, 30*time.Second)
 	if err != nil {
@@ -250,36 +258,39 @@ func TestPipelining(t *testing.T) {
 	if esmtp.Queue[0] != "From: from@example.net\r\nTo: to@example.com\r\nSubject: Test Mail\r\n\r\nこれはテストメールです。\r\n" {
 		t.Error("Wrong data in queue: " + esmtp.Queue[0])
 	}
+
+	fin <- 1
+	server.Wait()
 }
 
-func PrepareServer() (*MyServer, func(port int)) {
+func PrepareServer() (*MyServer, func(port int), chan int) {
+	fin := make(chan int)
 	esmtp := &MyServer{}
 	esmtpd := func(port int) {
-		addr, err := net.ResolveTCPAddr("tcp", "localhost:"+strconv.Itoa(port))
-		if err != nil {
-			panic(err)
-		}
-		listener, err := net.ListenTCP("tcp", addr)
-		if err != nil {
-			panic(err)
-		}
-
-		for {
-			conn, err := listener.AcceptTCP()
+		go func() {
+			listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 			if err != nil {
-				log.Printf("Accept Error: %v\n", err)
-				continue
+				return
 			}
 
-			esmtp.Init(&Option{Socket: conn})
-			esmtp.Register(&Pipelining{})
-			esmtp.Register(&Bit8mime{})
-			esmtp.SetCallback("RCPT", esmtp.ValidateRecipient)
-			esmtp.SetCallback("DATA", esmtp.QueueMessage)
-			esmtp.Process()
-			conn.Close()
-		}
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					log.Printf("Accept Error: %v\n", err)
+					return
+				}
+
+				esmtp.Init(&Option{Socket: conn})
+				esmtp.Register(&Pipelining{})
+				esmtp.Register(&Bit8mime{})
+				esmtp.SetCallback("RCPT", esmtp.ValidateRecipient)
+				esmtp.SetCallback("DATA", esmtp.QueueMessage)
+				esmtp.Process()
+				conn.Close()
+			}
+		}()
+		<-fin
 	}
 
-	return esmtp, esmtpd
+	return esmtp, esmtpd, fin
 }
